@@ -47,7 +47,7 @@ def load_data():
 def train_supervised_models(X_train, X_test, y_train, y_test):
     """Entraîne les modèles de classification"""
     models = {
-        'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42),
+        'Random Forest': RandomForestClassifier(n_estimators=166, random_state=42, max_depth=8),
         'Logistic Regression': LogisticRegression(random_state=42, max_iter=1000),
         'SVM': SVC(random_state=42, probability=True),
         'KNN': KNeighborsClassifier(n_neighbors=5)
@@ -116,6 +116,18 @@ def perform_clustering(X_scaled, n_clusters=3):
     }
     
     return clustering_results
+
+# Fonction pour traiter les valeurs aberrantes
+@st.cache_data
+def cap_outliers_iqr(column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower = Q1 - 1.5 * IQR
+    upper = Q3 + 1.5 * IQR
+    df[column] = np.where(df[column] < lower, lower,
+                 np.where(df[column] > upper, upper, df[column]))
+    
 
 # Chargement des données
 df = load_data()
@@ -278,12 +290,15 @@ elif selected_page == "🔧 Prétraitement":
     zero_df = pd.DataFrame(list(zero_counts.items()), columns=['Variable', 'Nombre de zéros'])
     st.dataframe(zero_df)
     
-    if st.checkbox("Afficher les statistiques après traitement des zéros"):
+    if st.checkbox("Afficher les statistiques après traitement des zéros et Imputation des Valeurs Manquantes"):
         df_cleaned = df.copy()
-        for var in problematic_vars:
-            if var in ['SkinThickness', 'Insulin']:  # Variables où 0 peut être problématique
-                df_cleaned[var] = df_cleaned[var].replace(0, df_cleaned[var].median())
-        
+        df_cleaned[problematic_vars] = df_cleaned[problematic_vars].replace(0, np.nan)
+
+        for col in problematic_vars:
+            if col in ["Insulin", "SkinThickness"]:
+                value = df_cleaned[col].mean()
+            else:
+                value = df_cleaned[col].median()
         st.write("Statistiques après remplacement des zéros par la médiane:")
         st.dataframe(df_cleaned[problematic_vars].describe())
     
